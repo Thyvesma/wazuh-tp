@@ -1,0 +1,102 @@
+# Wazuh TP - Environnement Manager + 2 Agents (Debian/Ubuntu)
+# Sans indexer ni dashboard - Validation via logs et fichiers d'alerte
+# Wazuh App Copyright (C) 2017, Wazuh Inc. (License GPLv2)
+
+services:
+  # ========== WAZUH MANAGER ==========
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.14.4
+    container_name: wazuh-manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655360
+        hard: 655360
+    ports:
+      - "1514:1514"   # Agent connection (TCP)
+      - "1515:1515"   # Agent enrollment (auth)
+      - "514:514/udp" # Syslog
+      - "55000:55000" # Wazuh API
+    environment:
+      - INDEXER_URL=https://localhost:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=none
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - ./config/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
+      - ./config/certs/root-ca.pem:/etc/ssl/root-ca.pem
+      - ./config/certs/filebeat.pem:/etc/ssl/filebeat.pem
+      - ./config/certs/filebeat.key:/etc/ssl/filebeat.key
+    networks:
+      - wazuh-net
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-u", "wazuh-wui:MyS3cr37P450r.*-", "-s", "https://localhost:55000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ========== AGENT DEBIAN 12 ==========
+  agent-debian:
+    build:
+      context: ./agents/agent-debian
+      dockerfile: Dockerfile
+    container_name: wazuh-agent-debian
+    hostname: agent-debian
+    restart: unless-stopped
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+    depends_on:
+      wazuh-manager:
+        condition: service_started
+    networks:
+      - wazuh-net
+
+  # ========== AGENT UBUNTU 22.04 ==========
+  agent-ubuntu:
+    build:
+      context: ./agents/agent-ubuntu
+      dockerfile: Dockerfile
+    container_name: wazuh-agent-ubuntu
+    hostname: agent-ubuntu
+    restart: unless-stopped
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+    depends_on:
+      wazuh-manager:
+        condition: service_started
+    networks:
+      - wazuh-net
+
+networks:
+  wazuh-net:
+    driver: bridge
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:

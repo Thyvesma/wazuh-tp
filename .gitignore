@@ -1,0 +1,15 @@
+# Fichiers intermédiaires des certificats (les .pem sont nécessaires)
+config/certs/*.key
+config/certs/*.csr
+config/certs/*.srl
+config/certs/root-ca-manager.pem
+config/certs/wazuh-manager.pem
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
